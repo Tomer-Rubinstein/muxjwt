@@ -4,13 +4,13 @@ import (
 	"fmt"
 	"net/http"
 	"github.com/gorilla/mux"
-	"example.com/"
+	"example.com/muxjwt"
 )
 
 func main() {
   r := mux.NewRouter()
+	jwt := muxjwt.NewMuxJWT(r, auth, identify)
   r.HandleFunc("/login", LoginHandler).Methods("GET")
-	r.HandleFunc("/auth", AuthHandler).Methods("POST")
 	http.ListenAndServe(":80", r)
 }
 
@@ -18,10 +18,11 @@ func LoginHandler(w http.ResponseWriter, r *http.Request){
 	fmt.Fprintf(w, "Welcome to the login page!")
 }
 
-func AuthHandler(w http.ResponseWriter, r *http.Request){
-	// vars := mux.Vars(r)
-  // w.WriteHeader(http.StatusOK)
-
-	fmt.Fprintf(w, "You've requested the book: %s on page %s\n", title, page)
+func auth(username string, passw string) bool {
+	if username == "admin" && passw == "admin" {
+		return true
+	}
+	return false
 }
 
+func identify() { }
