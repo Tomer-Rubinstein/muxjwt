@@ -4,14 +4,18 @@ import (
 	"encoding/json"
 	"fmt"
 	b64 "encoding/base64"
-	"github.com/gorilla/mux"
+	mux "github.com/gorilla/mux"
+	"crypto/hmac"
+	"crypto/sha256"
+	"net/http"
 )
 
 type MuxJWT struct {
-	r *Router
-	authenticate *func
-	identify *func // used to check for token expiration, roles, etc..
+	r *mux.Router
+	authenticate func(string, string) bool
+	identify func() // used to check for token expiration, roles, etc..
 }
+
 
 func GenerateHeader() string {
 	type Header struct {
@@ -55,14 +59,14 @@ func GenerateJWT(userid string, iat int) string {
 }
 
 
-func NewMuxJWT(router *Router, authFunc *func, identifyFunc *func) MuxJWT {
+func NewMuxJWT(router *mux.Router, authFunc func(string, string) bool, identifyFunc func()) MuxJWT {
 	router.HandleFunc("/auth", func(w http.ResponseWriter, r *http.Request){
 		user := r.FormValue("user")
 		password := r.FormValue("password")
-		var jwt_token
+		var jwt_token string
 
-		if authFunc(user, password) {
-			jwt_token = GenerateJWT(user, 999999999) # TODO: token expiration
+		if authFunc(user, password) == true {
+			jwt_token = GenerateJWT(user, 999999999) // TODO: token expiration
 		}
 		fmt.Fprintf(w, jwt_token)
 	}).Methods("POST")
@@ -72,11 +76,4 @@ func NewMuxJWT(router *Router, authFunc *func, identifyFunc *func) MuxJWT {
 		authenticate: authFunc,
 		identify: identifyFunc,
 	}
-}
-
-
-// DEBUG
-func main(){
-	fmt.Println("[DEBUG]\n")
-	fmt.Println(GeneratePayload("tomer", 819238212))
 }
