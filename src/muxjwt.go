@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	b64 "encoding/base64"
-	mux "github.com/gorilla/mux"
+	"github.com/gorilla/mux"
 	"crypto/hmac"
 	"crypto/sha256"
 	"net/http"
@@ -30,6 +30,7 @@ func GenerateHeader() string {
 	return b64.URLEncoding.EncodeToString(headerBytes)
 }
 
+
 func GeneratePayload(subject string, issuedAt int) string {
 	type Payload struct {
 		Sub string `json:"sub"`
@@ -43,6 +44,7 @@ func GeneratePayload(subject string, issuedAt int) string {
 	return b64.URLEncoding.EncodeToString(payloadBytes)
 }
 
+
 func GenerateSignature(encodedHeader string, encodedPayload string, secret_salt string) string {
 	data := encodedHeader + "." + encodedPayload
 	h := hmac.New(sha256.New, []byte(secret_salt))
@@ -50,6 +52,7 @@ func GenerateSignature(encodedHeader string, encodedPayload string, secret_salt 
 
 	return b64.StdEncoding.EncodeToString(h.Sum(nil))
 }
+
 
 func GenerateJWT(userid string, iat int) string {
 	encHeader := GenerateHeader()
@@ -60,6 +63,7 @@ func GenerateJWT(userid string, iat int) string {
 
 
 func NewMuxJWT(router *mux.Router, authFunc func(string, string) bool, identifyFunc func()) MuxJWT {
+
 	router.HandleFunc("/auth", func(w http.ResponseWriter, r *http.Request){
 		user := r.FormValue("user")
 		password := r.FormValue("password")
@@ -67,8 +71,8 @@ func NewMuxJWT(router *mux.Router, authFunc func(string, string) bool, identifyF
 
 		if authFunc(user, password) == true {
 			jwt_token = GenerateJWT(user, 999999999) // TODO: token expiration
+			fmt.Fprintf(w, jwt_token)
 		}
-		fmt.Fprintf(w, jwt_token)
 	}).Methods("POST")
 
 	return MuxJWT {
@@ -76,4 +80,8 @@ func NewMuxJWT(router *mux.Router, authFunc func(string, string) bool, identifyF
 		authenticate: authFunc,
 		identify: identifyFunc,
 	}
+}
+
+func protect(mjwt MuxJWT, r *mux.Route) {
+	fmt.Println("works")
 }
