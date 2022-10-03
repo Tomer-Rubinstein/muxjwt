@@ -11,8 +11,8 @@ $ go get -u github.com/Tomer-Rubinstein/muxjwt
 Add the necessary imports:
 ```go
 import (
-	"github.com/Tomer-Rubinstein/muxjwt"
-	"github.com/gorilla/mux"
+  "github.com/Tomer-Rubinstein/muxjwt"
+  "github.com/gorilla/mux"
   "net/http"
 )
 ```
@@ -29,9 +29,9 @@ The "username" and "password" arguments are the POST request body data keys to p
 For simplicity sake, we'll just authenticate a single admin user, like so:
 ```go
 func authFunc(body map[string]string) bool {
-	username := body["username"]
-	password := body["password"]
-	return username == "admin" && password == "admin"
+  username := body["username"]
+  password := body["password"]
+  return username == "admin" && password == "admin"
 }
 ```
 Now let's create 2 routes: one for the login page and the other be a secret page that only authenticated users can access.
@@ -44,19 +44,19 @@ Using the ``ProtectedRoute`` function, MuxJWT will require the request to satisf
 The handlers:
 ```go
 func LoginHandler(w http.ResponseWriter, r *http.Request){
-	http.ServeFile(w, r, "./static/LoginPage.html")
+  http.ServeFile(w, r, "./static/LoginPage.html")
 }
 
 func SecretHandler(w http.ResponseWriter, r *http.Request){
-	http.ServeFile(w, r, "./static/SecretPage.html")
+  http.ServeFile(w, r, "./static/SecretPage.html")
 }
 ```
 LoginPage.html contains the following form:
 ```HTML
 <form action="/auth" method="post">
-	<input type="text" id="username" name="username"><br>
-	<input type="password" id="password" name="password"><br><br>
-	<input type="submit" value="Submit">
+  <input type="text" id="username" name="username"><br>
+  <input type="password" id="password" name="password"><br><br>
+  <input type="submit" value="Submit">
 </form>
 ```
 Say we submitted ``username=admin&password=admin`` as our POST body data to ``/auth``, MuxJWT will then verify the data and return a JWT accordingly.
