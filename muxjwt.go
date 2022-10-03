@@ -11,6 +11,9 @@ import (
 	"time"
 )
 
+var SECRET string
+var EXPIRATION_TIME int64 // Note: in seconds
+
 /*
 func TokenReadPayload validates a given jwt (including expiration) and reads the
 payload of the jwt.
@@ -44,7 +47,7 @@ func TokenReadPayload(jwt string, secret string, expirationSec int64) (interface
 		return nil, errors.New("Token is expired")
 	}
 
-	if !CmpHmacStr(token[0] + "." + token[1], secret, token[2]) {
+	if !cmpHmacStr(token[0] + "." + token[1], secret, token[2]) {
 		return nil, errors.New("Invalid JWT format")
 	}
 
@@ -72,7 +75,7 @@ func InitAuthRoute(router *mux.Router, authFunc func(map[string]string) bool, au
 
 		var jwt_token string
 		if authFunc(body) == true {
-			jwt_token = GenerateJWT(body["username"])
+			jwt_token = generateJWT(body["username"])
 			fmt.Fprintf(w, jwt_token) // TODO: use gorilla/securecookie
 		}
 	}).Methods("POST")
@@ -96,7 +99,7 @@ func ProtectedRoute(r *mux.Router, route string, handler func(http.ResponseWrite
 			return
 		}
 
-		_, err := TokenReadPayload(token, "DEBUG_SECRET", 60) // TODO: config
+		_, err := TokenReadPayload(token, SECRET, EXPIRATION_TIME) // TODO: config
 		if err != nil {
 			fmt.Println(err)
 			fmt.Fprintf(w, "Authentication error")
@@ -118,7 +121,9 @@ func ProtectedRoute(r *mux.Router, route string, handler func(http.ResponseWrite
 func main() {
   r := mux.NewRouter()
 	InitAuthRoute(r, authFunc, "/auth", "username", "password")
-	
+	SECRET = "DEBUG_SECRET"
+	EXPIRATION_TIME = 60
+
   r.HandleFunc("/login", LoginHandler).Methods("GET")
 	ProtectedRoute(r, "/secret", SecretHandler).Methods("GET")
 	fmt.Println("Listening on port 3000..")
