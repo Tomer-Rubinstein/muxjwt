@@ -2,7 +2,7 @@
 > MuxJWT: implement JWT authentication with gorilla/mux
 
 ## Installation
-In a working directory with a ``go.mod``  file and [gorilla/mux](https://github.com/gorilla/mux) installed, type:
+In a working directory with a ``go.mod`` file and [gorilla/mux](https://github.com/gorilla/mux) installed, type:
 ```go
 $ go get -u github.com/Tomer-Rubinstein/muxjwt
 ```
@@ -13,6 +13,7 @@ Add the necessary imports:
 import (
 	"github.com/Tomer-Rubinstein/muxjwt"
 	"github.com/gorilla/mux"
+  "net/http"
 )
 ```
 To initialize an authentication route:
@@ -61,4 +62,4 @@ LoginPage.html contains the following form:
 Say we submitted ``username=admin&password=admin`` as our POST body data to ``/auth``, MuxJWT will then verify the data and return a JWT accordingly.
 **This JWT should be stored in client's localStorage**
 
-Now, to access the ``/secret`` page, we shall pass ``Authorization: Bearer <jwt>`` as a header to our GET request and if the token is valid and still not expired, we will get the contents of the secret page!
+Now, to access the ``/secret`` page, we shall pass ``Authorization: Bearer <jwt>`` as a header to our GET request and if the token is valid (and in particular not expired), we will get the contents of the secret page!
