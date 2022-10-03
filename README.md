@@ -19,10 +19,10 @@ import (
 To initialize an authentication route:
 ```go
 r := mux.NewRouter()
-// The following creates an "/auth" route that accepts
-// only POST requests.
+// The following creates an "/auth" route that accepts POST requests.
 muxjwt.InitAuthRoute(r, authFunc, "/auth", "username", "pasword")
-// The next 2 lines are a MUST have in every MuxJWT application.
+
+// The next 2 lines are a MUST have in every MuxJWT application:
 muxjwt.SECRET = "my_secret" // define the secret for the encryption of the JWT (string)
 muxjwt.EXPIRATION_TIME = 60 // define the expiration time IN SECONDS of each JWT (int64)
 ```
