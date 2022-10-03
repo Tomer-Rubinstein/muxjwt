@@ -3,7 +3,7 @@
 
 ## Installation
 In a working directory with a ``go.mod`` file and [gorilla/mux](https://github.com/gorilla/mux) installed, type:
-```go
+```
 $ go get -u github.com/Tomer-Rubinstein/muxjwt
 ```
 
