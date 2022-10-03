@@ -1,66 +1,28 @@
-package main // debug
-// package muxjwt
+package muxjwt
 
 import (
 	"encoding/json"
 	"fmt"
 	b64 "encoding/base64"
 	"github.com/gorilla/mux"
-	"crypto/hmac"
-	"crypto/sha256"
 	"net/http"
 	"strings"
-	"time"
 	"errors"
+	"time"
 )
 
-type MuxJWT struct {
-	r *mux.Router
-	authenticate func(string, string) bool
-	identify func() // used to check for token expiration, roles, etc..
-}
-
-type Header struct {
-	Alg string `json:"alg"`
-	Typ string `json:"typ"`
-}
-
-type Payload struct {
-	Sub string `json:"sub"`
-	Iat int64 `json:"iat"`
-}
-
-func GenerateHeader() string {
-	header := Header {
-		Alg: "HS256",
-		Typ: "JWT",
-	}
-	headerBytes, _ := json.Marshal(header)
-	return b64.URLEncoding.EncodeToString(headerBytes)
-}
-
-
-func GeneratePayload(subject string, issuedAt int64) string {
-	payload := Payload {
-		Sub: subject,
-		Iat: issuedAt,
-	}
-	payloadBytes, _ := json.Marshal(payload)
-	return b64.URLEncoding.EncodeToString(payloadBytes)
-}
-
-
-func GenerateSignature(encodedHeader string, encodedPayload string, secret_salt string) string {
-	return HmacEncodeStr(encodedHeader + "." + encodedPayload, secret_salt)
-}
-
-
-func HmacEncodeStr(str string, secret string) string {
-	h := hmac.New(sha256.New, []byte(secret))
-	h.Write([]byte(str))
-	return b64.StdEncoding.EncodeToString(h.Sum(nil))
-}
-
+/*
+func TokenReadPayload validates a given jwt (including expiration) and reads the
+payload of the jwt.
+@params:
+	- jwt(string), the JSON Web Token
+	- secret(string), the secret salt used to encode the token
+	- expirationSec(int64), the life-time of the token in seconds
+@return: (
+	- interface{}, nil if error occurred, otherwise, parsed Payload struct
+	- error
+)
+*/
 func TokenReadPayload(jwt string, secret string, expirationSec int64) (interface{}, error) {
 	token := strings.Split(jwt, ".") // '.' isn't a base64 character
 	if len(token) != 3 {
@@ -82,48 +44,54 @@ func TokenReadPayload(jwt string, secret string, expirationSec int64) (interface
 		return nil, errors.New("Token is expired")
 	}
 
-	if !CmpHmacStr(token[0] + "." + token[1], token[2], secret) {
+	if !CmpHmacStr(token[0] + "." + token[1], secret, token[2]) {
 		return nil, errors.New("Invalid JWT format")
 	}
 
 	return payload, nil
 }
 
-func CmpHmacStr(str string, hmac string, secret string) bool {
-	return HmacEncodeStr(str, secret) == hmac
-}
+/*
+func InitAuthRoute initializes a new auth route using Gorilla Mux.
+this route is used for authenticating user credentials given by POST request body parameters
+and validates the credentials based on a given auth function.
+@params:
+	- router(*mux.Router), the router instance of the app
+	- authFunc(func(...string)->bool), the authentication function to validate given user credentials
+	- authRoute(string), the route to bind the auth service to
+	- bodyParams(...string), the names(keys) of the POST body parameters to give to authFunc as values (ORDER MATTERS!)
+@return: nil (void)
+*/
+func InitAuthRoute(router *mux.Router, authFunc func(...string) bool, authRoute string, bodyParams ...string) {
+	router.HandleFunc(authRoute, func(w http.ResponseWriter, r *http.Request){
+		bodyVals := bodyParams
+		for i:=0; i < len(bodyParams); i++ {
+			bodyVals[i] = r.FormValue(bodyParams[i])
+		}
 
-func GenerateJWT(userid string, iat int64) string {
-	encHeader := GenerateHeader()
-	encPayload := GeneratePayload(userid, iat)
-	encSignature := GenerateSignature(encHeader, encPayload, "DEBUG_SECRET")
-	return encHeader + "." + encPayload + "." + encSignature
-}
-
-func NewMuxJWT(router *mux.Router, authFunc func(string, string) bool, identifyFunc func()) MuxJWT {
-	router.HandleFunc("/auth", func(w http.ResponseWriter, r *http.Request){
-		user := r.FormValue("user")
-		password := r.FormValue("password")
 		var jwt_token string
-
-		if authFunc(user, password) == true {
-			jwt_token = GenerateJWT(user, time.Now().Unix())
-			fmt.Fprintf(w, jwt_token)
+		if authFunc(bodyVals...) == true {
+			jwt_token = GenerateJWT(bodyVals[0])
+			fmt.Fprintf(w, jwt_token) // TODO: store in client local storage
 		}
 	}).Methods("POST")
-
-	return MuxJWT {
-		r: router,
-		authenticate: authFunc,
-		identify: identifyFunc,
-	}
 }
 
+/*
+func ProtectedRoute creates a new route using Gorilla Mux that can only be accessed to by using a valid JWT
+in the request header "Authorization"
+@params:
+	- r(*mux.Router), the router instance of the app
+	- route(string), the route to protect
+	- handler(func(http.ResponseWriter, *http.Request)->Any), the handler function to the route
+@return: *mux.Route, so you can continue using this route as a normal r.HandleFunc() struct type
+*/
 func ProtectedRoute(r *mux.Router, route string, handler func(http.ResponseWriter, *http.Request)) *mux.Route {
 	return r.HandleFunc(route, func(w http.ResponseWriter, r *http.Request){
 		token := r.Header["Authorization"]
+		// TODO: token.remove("Bearer ")
 		if token == nil {
-			fmt.Fprintf(w, "no auth token was given")
+			fmt.Fprintf(w, "No auth token was given")
 			return
 		}
 
@@ -133,23 +101,25 @@ func ProtectedRoute(r *mux.Router, route string, handler func(http.ResponseWrite
 			fmt.Fprintf(w, "Authentication error")
 			return
 		}
-
 		// TODO: add roles
-
-		fmt.Println(token)
 		handler(w, r)
 	})
 }
 
 
 
+
+
+
+
+
 /* DEBUG */
 func main() {
   r := mux.NewRouter()
-	NewMuxJWT(r, auth, identify)
+	InitAuthRoute(r, authFunc, "/auth")
 	
   r.HandleFunc("/login", LoginHandler).Methods("GET")
-	ProtectedRoute(r, "/secret", SecretHandler)
+	ProtectedRoute(r, "/secret", SecretHandler).Methods("GET")
 	fmt.Println("Listening on port 3000..")
 	http.ListenAndServe(":3000", r)
 }
@@ -162,8 +132,8 @@ func SecretHandler(w http.ResponseWriter, r *http.Request){
 	http.ServeFile(w, r, "./static/SecretPage.html")
 }
 
-func auth(username string, passw string) bool {
-	return username == "admin" && passw == "admin"
+func authFunc(bodyVals ...string) bool {
+	username := bodyVals[0]
+	password := bodyVals[1]
+	return username == "admin" && password == "admin"
 }
-
-func identify() { }
