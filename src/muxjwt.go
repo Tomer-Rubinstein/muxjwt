@@ -59,20 +59,21 @@ and validates the credentials based on a given auth function.
 	- router(*mux.Router), the router instance of the app
 	- authFunc(func(...string)->bool), the authentication function to validate given user credentials
 	- authRoute(string), the route to bind the auth service to
-	- bodyParams(...string), the names(keys) of the POST body parameters to give to authFunc as values (ORDER MATTERS!)
+	- bodyKeys(...string), the names(keys) of the POST body parameters to give to authFunc as values (ORDER MATTERS!)
 @return: nil (void)
 */
-func InitAuthRoute(router *mux.Router, authFunc func(...string) bool, authRoute string, bodyParams ...string) {
+func InitAuthRoute(router *mux.Router, authFunc func(map[string]string) bool, authRoute string, bodyKeys ...string) {
 	router.HandleFunc(authRoute, func(w http.ResponseWriter, r *http.Request){
-		bodyVals := bodyParams
-		for i:=0; i < len(bodyParams); i++ {
-			bodyVals[i] = r.FormValue(bodyParams[i])
+		// TODO?: accept JSON as POST data
+		body := make(map[string]string)
+		for i:=0; i < len(bodyKeys); i++ {
+			body[bodyKeys[i]] = r.FormValue(bodyKeys[i])
 		}
 
 		var jwt_token string
-		if authFunc(bodyVals...) == true {
-			jwt_token = GenerateJWT(bodyVals[0])
-			fmt.Fprintf(w, jwt_token) // TODO: store in client local storage
+		if authFunc(body) == true {
+			jwt_token = GenerateJWT(body["username"])
+			fmt.Fprintf(w, jwt_token) // TODO: use gorilla/securecookie
 		}
 	}).Methods("POST")
 }
@@ -88,14 +89,14 @@ in the request header "Authorization"
 */
 func ProtectedRoute(r *mux.Router, route string, handler func(http.ResponseWriter, *http.Request)) *mux.Route {
 	return r.HandleFunc(route, func(w http.ResponseWriter, r *http.Request){
-		token := r.Header["Authorization"]
-		// TODO: token.remove("Bearer ")
-		if token == nil {
+		// TODO: what is the need of the "Bearer" prefix?
+		token := strings.Trim(r.Header["Authorization"][0], "Bearer ")
+		if token == "" {
 			fmt.Fprintf(w, "No auth token was given")
 			return
 		}
 
-		_, err := TokenReadPayload(token[0], "DEBUG_SECRET", 60)
+		_, err := TokenReadPayload(token, "DEBUG_SECRET", 60) // TODO: config
 		if err != nil {
 			fmt.Println(err)
 			fmt.Fprintf(w, "Authentication error")
@@ -116,7 +117,7 @@ func ProtectedRoute(r *mux.Router, route string, handler func(http.ResponseWrite
 /* DEBUG */
 func main() {
   r := mux.NewRouter()
-	InitAuthRoute(r, authFunc, "/auth")
+	InitAuthRoute(r, authFunc, "/auth", "username", "password")
 	
   r.HandleFunc("/login", LoginHandler).Methods("GET")
 	ProtectedRoute(r, "/secret", SecretHandler).Methods("GET")
@@ -132,8 +133,8 @@ func SecretHandler(w http.ResponseWriter, r *http.Request){
 	http.ServeFile(w, r, "./static/SecretPage.html")
 }
 
-func authFunc(bodyVals ...string) bool {
-	username := bodyVals[0]
-	password := bodyVals[1]
+func authFunc(body map[string]string) bool {
+	username := body["username"]
+	password := body["password"]
 	return username == "admin" && password == "admin"
 }
