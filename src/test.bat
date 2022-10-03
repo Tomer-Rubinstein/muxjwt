@@ -1,0 +1,1 @@
+curl http://127.0.0.1:3000/secret --header "Authorization: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZG1pbiIsImlhdCI6MTY2NDc0MDczNH0=.gI7e647vc1Et3Ed6VziGPckmuc77r5hgETyGr3QaXZ0="
