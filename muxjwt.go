@@ -13,15 +13,34 @@ import (
 
 // TODO: implement gorilla/securecookie(s) instead
 // TODO: implement logout functionality
+// TODO: auth func should also accept JSON post data
 
-var Secret string
-var ExpirationTime int64 // Note: in seconds
-var Host string
+// var Secret string
+// var ExpirationTime int64 // Note: in seconds
+// var Host string
 
-func init(){
-	Secret = "DEBUG_SECRET"
-	ExpirationTime = 60
-	Host = "localhost"
+type MuxJWT struct {
+	Secret string
+	ExpirationTime int64
+	Host string
+}
+
+func NewMuxJWT(secret string, expTime int64, host string) MuxJWT {
+	if secret == "" {
+		panic("MuxJWT: secret must not be an empty string")
+	}
+	if expTime <= 0 {
+		panic("MuxJWT: expiration time shouldn't be nil(0) nor negative")
+	}
+	if host == "" {
+		panic("MuxJWT: host undefined")
+	}
+
+	return MuxJWT {
+		Secret: secret,
+		ExpirationTime: expTime,
+		Host: host,
+	}
 }
 
 /*
@@ -34,7 +53,7 @@ payload of the jwt.
 	- error
 )
 */
-func TokenReadPayload(jwt string) (interface{}, error) {
+func (m MuxJWT) TokenReadPayload(jwt string) (interface{}, error) {
 	token := strings.Split(jwt, ".") // '.' isn't a base64 character
 	if len(token) != 3 {
 		return nil, errors.New("Token isn't consisted of 3 parts: HEADER.PAYLOAD.SIGNATURE")
@@ -51,11 +70,11 @@ func TokenReadPayload(jwt string) (interface{}, error) {
 		return nil, err
 	}
 
-	if time.Now().Unix() - payload.Iat >= ExpirationTime {
+	if time.Now().Unix() - payload.Iat >= m.ExpirationTime {
 		return nil, errors.New("Token is expired")
 	}
 
-	if !cmpHmacStr(token[0] + "." + token[1], Secret, token[2]) {
+	if !cmpHmacStr(token[0] + "." + token[1], m.Secret, token[2]) {
 		return nil, errors.New("Invalid JWT format")
 	}
 
@@ -73,7 +92,7 @@ and validates the credentials based on a given auth function.
 	- bodyKeys(...string), the names(keys) of the POST body parameters to give to authFunc as values (ORDER MATTERS!)
 @return: nil (void)
 */
-func InitAuthRoute(router *mux.Router, authFunc func(map[string]string) bool, authRoute string, identifyFunc func(map[string]string)string, bodyKeys ...string) {
+func (m MuxJWT) InitAuthRoute(router *mux.Router, authFunc func(map[string]string) bool, authRoute string, identifyFunc func(map[string]string)string, bodyKeys ...string) {
 	router.HandleFunc(authRoute, func(w http.ResponseWriter, r *http.Request){
 		// TODO?: accept JSON as POST data
 		body := make(map[string]string)
@@ -84,12 +103,12 @@ func InitAuthRoute(router *mux.Router, authFunc func(map[string]string) bool, au
 		var jwt_token string
 		fmt.Println(body)
 		if authFunc(body) == true {
-			jwt_token = generateJWT(identifyFunc(body))
-			jwt_payload, err := TokenReadPayload(jwt_token)
+			jwt_token = m.GenerateJWT(identifyFunc(body))
+			jwt_payload, err := m.TokenReadPayload(jwt_token)
 			if err != nil {
 				panic("Invalid JWT: couldn't read payload")
 			}
-			cookie := newCookie("token_"+Host, jwt_token, Host, "/secret", jwt_payload.(Payload).Iat)
+			cookie := m.NewCookie("token_"+m.Host, jwt_token, m.Host, jwt_payload.(Payload).Iat)
 
 			http.SetCookie(w, cookie)
 			fmt.Fprintf(w, jwt_token) // DEBUG
@@ -106,15 +125,15 @@ in the request header "Authorization"
 	- handler(func(http.ResponseWriter, *http.Request)->Any), the handler function to the route
 @return: *mux.Route, so you can continue using this route as a normal r.HandleFunc() struct type
 */
-func ProtectedRoute(r *mux.Router, route string, handler func(http.ResponseWriter, *http.Request)) *mux.Route {
+func (m MuxJWT) ProtectedRoute(r *mux.Router, route string, handler func(http.ResponseWriter, *http.Request)) *mux.Route {
 	return r.HandleFunc(route, func(w http.ResponseWriter, r *http.Request){
-		tokenCookie, err := r.Cookie("token_"+Host)
+		tokenCookie, err := r.Cookie("token_"+m.Host)
 		if err != nil {
 			fmt.Printf("Error occured while reading testcookie")
 			return
 		}
 
-		_, err = TokenReadPayload(tokenCookie.Value)
+		_, err = m.TokenReadPayload(tokenCookie.Value)
 		if err != nil {
 			fmt.Println(err)
 			fmt.Fprintf(w, "Authentication error") // TODO: add customizability
