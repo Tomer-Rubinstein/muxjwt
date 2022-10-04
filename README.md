@@ -23,7 +23,7 @@ r := mux.NewRouter()
 muxjwt.InitAuthRoute(r, authFunc, "/auth", "username", "pasword")
 
 // The next 2 lines are a MUST have in every MuxJWT application:
-muxjwt.SECRET = "my_secret" // define the secret for the encryption of the JWT (string)
+muxjwt.SECRET = "my_secret" // define the secret for the encryption of each JWT (string)
 muxjwt.EXPIRATION_TIME = 60 // define the expiration time IN SECONDS of each JWT (int64)
 ```
 Where ``authFunc`` is the function responsible for authenticating given user credentials. I.e. lookup user in a database and check for a matching password.

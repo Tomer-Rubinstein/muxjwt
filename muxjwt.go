@@ -11,8 +11,18 @@ import (
 	"time"
 )
 
-var SECRET string
-var EXPIRATION_TIME int64 // Note: in seconds
+// TODO: implement gorilla/securecookie(s) instead
+
+var Secret string
+var ExpirationTime int64 // Note: in seconds
+var Host string
+
+func init(){
+	Secret = "DEBUG_SECRET"
+	ExpirationTime = 60
+	Host = "localhost"
+}
+
 
 /*
 func TokenReadPayload validates a given jwt (including expiration) and reads the
@@ -65,7 +75,7 @@ and validates the credentials based on a given auth function.
 	- bodyKeys(...string), the names(keys) of the POST body parameters to give to authFunc as values (ORDER MATTERS!)
 @return: nil (void)
 */
-func InitAuthRoute(router *mux.Router, authFunc func(map[string]string) bool, authRoute string, bodyKeys ...string) {
+func InitAuthRoute(router *mux.Router, authFunc func(map[string]string) bool, authRoute string, identifyFunc func(map[string]string)string, bodyKeys ...string) {
 	router.HandleFunc(authRoute, func(w http.ResponseWriter, r *http.Request){
 		// TODO?: accept JSON as POST data
 		body := make(map[string]string)
@@ -74,9 +84,18 @@ func InitAuthRoute(router *mux.Router, authFunc func(map[string]string) bool, au
 		}
 
 		var jwt_token string
+		fmt.Println(body)
 		if authFunc(body) == true {
-			jwt_token = generateJWT(body["username"])
-			fmt.Fprintf(w, jwt_token) // TODO: use gorilla/securecookie
+			jwt_token = generateJWT(identifyFunc(body))
+			jwt_payload, err := TokenReadPayload(jwt_token, Secret, ExpirationTime)
+			if err != nil {
+				panic("Invalid JWT: couldn't read payload")
+			}
+			// TODO: single cookie to multiple path (list of protected routes)
+			cookie := newCookie("token_"+Host, jwt_token, Host, "/secret", jwt_payload.(Payload).Iat)
+
+			http.SetCookie(w, cookie)
+			fmt.Fprintf(w, jwt_token) // DEBUG
 		}
 	}).Methods("POST")
 }
@@ -93,13 +112,14 @@ in the request header "Authorization"
 func ProtectedRoute(r *mux.Router, route string, handler func(http.ResponseWriter, *http.Request)) *mux.Route {
 	return r.HandleFunc(route, func(w http.ResponseWriter, r *http.Request){
 		// TODO: what is the need of the "Bearer" prefix?
-		token := strings.Trim(r.Header["Authorization"][0], "Bearer ")
-		if token == "" {
-			fmt.Fprintf(w, "No auth token was given")
+		// token := strings.Trim(r.Header["Authorization"][0], "Bearer ")
+		tokenCookie, err := r.Cookie("testcookie")
+		if err != nil {
+			fmt.Printf("Error occured while reading testcookie")
 			return
 		}
 
-		_, err := TokenReadPayload(token, SECRET, EXPIRATION_TIME) // TODO: config
+		_, err = TokenReadPayload(tokenCookie.Value, Secret, ExpirationTime) // TODO: config
 		if err != nil {
 			fmt.Println(err)
 			fmt.Fprintf(w, "Authentication error")
@@ -108,38 +128,4 @@ func ProtectedRoute(r *mux.Router, route string, handler func(http.ResponseWrite
 		// TODO: add roles
 		handler(w, r)
 	})
-}
-
-
-
-
-
-
-
-
-/* DEBUG */
-func main() {
-  r := mux.NewRouter()
-	InitAuthRoute(r, authFunc, "/auth", "username", "password")
-	SECRET = "DEBUG_SECRET"
-	EXPIRATION_TIME = 60
-
-  r.HandleFunc("/login", LoginHandler).Methods("GET")
-	ProtectedRoute(r, "/secret", SecretHandler).Methods("GET")
-	fmt.Println("Listening on port 3000..")
-	http.ListenAndServe(":3000", r)
-}
-
-func LoginHandler(w http.ResponseWriter, r *http.Request){
-	http.ServeFile(w, r, "./static/LoginPage.html")
-}
-
-func SecretHandler(w http.ResponseWriter, r *http.Request){
-	http.ServeFile(w, r, "./static/SecretPage.html")
-}
-
-func authFunc(body map[string]string) bool {
-	username := body["username"]
-	password := body["password"]
-	return username == "admin" && password == "admin"
 }

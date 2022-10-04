@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	b64 "encoding/base64"
 	"time"
+	"net/http"
+	"fmt"
 )
 
 
@@ -69,6 +71,32 @@ func GenerateJWT creates a JWT string
 func generateJWT(userid string) string {
 	encHeader := generateHeader()
 	encPayload := generatePayload(userid)
-	encSignature := generateSignature(encHeader, encPayload, SECRET)
+	encSignature := generateSignature(encHeader, encPayload, Secret)
 	return encHeader + "." + encPayload + "." + encSignature
+}
+
+/*
+func newCookie declares a new http.Cookie instance by given parameters
+@params:
+	- name(string), name of the cookie
+	- value(string), value of the cookie
+	- domain(string), to which domain this cookie points to
+	- path(string), to which path to send this cookie
+	- iat(int64), "issued at": the Unix timestamp at which the jwt was created
+*/
+func newCookie(name string, value string, domain string, path string, iat int64) *http.Cookie {
+	cookie := new(http.Cookie)
+	cookie.Name = name
+	cookie.Value = value
+	cookie.Domain = domain
+	cookie.Path = path
+	// cookie.Expires = <time obj>
+	cookie.RawExpires = fmt.Sprint(iat + ExpirationTime)
+	// cookie.MaxAge = <seconds>
+	cookie.Secure = false
+	cookie.HttpOnly = true
+	cookie.Raw = fmt.Sprintf("%s: %s", cookie.Name, cookie.Value)
+	cookie.Unparsed = []string{cookie.Raw}
+
+	return cookie
 }
