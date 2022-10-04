@@ -9,11 +9,12 @@ import (
 
 func main() {
   r := mux.NewRouter()
-	muxjwt.InitAuthRoute(r, authFunc, "/auth", identifyFunc, "username", "password")
+	m := muxjwt.NewMuxJWT("my_secret", 60*60*24*7, "localhost")
+	m.InitAuthRoute(r, authFunc, "/auth", identifyFunc, "username", "password")
 
   r.HandleFunc("/login", LoginHandler).Methods("GET")
-	muxjwt.ProtectedRoute(r, "/secret", SecretHandler).Methods("GET")
-	muxjwt.ProtectedRoute(r, "/secret2", SecondSecretHandler).Methods("GET")
+	m.ProtectedRoute(r, "/secret", SecretHandler).Methods("GET")
+	m.ProtectedRoute(r, "/secret2", SecondSecretHandler).Methods("GET")
 	fmt.Println("Listening on port 3000..")
 	http.ListenAndServe(":3000", r)
 }
