@@ -89,7 +89,7 @@ func newCookie(name string, value string, domain string, path string, iat int64)
 	cookie.Name = name
 	cookie.Value = value
 	cookie.Domain = domain
-	cookie.Path = path
+	// cookie.Path = path
 	// cookie.Expires = <time obj>
 	cookie.RawExpires = fmt.Sprint(iat + ExpirationTime)
 	// cookie.MaxAge = <seconds>

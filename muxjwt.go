@@ -12,6 +12,7 @@ import (
 )
 
 // TODO: implement gorilla/securecookie(s) instead
+// TODO: implement logout functionality
 
 var Secret string
 var ExpirationTime int64 // Note: in seconds
@@ -23,20 +24,17 @@ func init(){
 	Host = "localhost"
 }
 
-
 /*
 func TokenReadPayload validates a given jwt (including expiration) and reads the
 payload of the jwt.
 @params:
 	- jwt(string), the JSON Web Token
-	- secret(string), the secret salt used to encode the token
-	- expirationSec(int64), the life-time of the token in seconds
 @return: (
 	- interface{}, nil if error occurred, otherwise, parsed Payload struct
 	- error
 )
 */
-func TokenReadPayload(jwt string, secret string, expirationSec int64) (interface{}, error) {
+func TokenReadPayload(jwt string) (interface{}, error) {
 	token := strings.Split(jwt, ".") // '.' isn't a base64 character
 	if len(token) != 3 {
 		return nil, errors.New("Token isn't consisted of 3 parts: HEADER.PAYLOAD.SIGNATURE")
@@ -53,11 +51,11 @@ func TokenReadPayload(jwt string, secret string, expirationSec int64) (interface
 		return nil, err
 	}
 
-	if time.Now().Unix() - payload.Iat >= expirationSec {
+	if time.Now().Unix() - payload.Iat >= ExpirationTime {
 		return nil, errors.New("Token is expired")
 	}
 
-	if !cmpHmacStr(token[0] + "." + token[1], secret, token[2]) {
+	if !cmpHmacStr(token[0] + "." + token[1], Secret, token[2]) {
 		return nil, errors.New("Invalid JWT format")
 	}
 
@@ -87,11 +85,10 @@ func InitAuthRoute(router *mux.Router, authFunc func(map[string]string) bool, au
 		fmt.Println(body)
 		if authFunc(body) == true {
 			jwt_token = generateJWT(identifyFunc(body))
-			jwt_payload, err := TokenReadPayload(jwt_token, Secret, ExpirationTime)
+			jwt_payload, err := TokenReadPayload(jwt_token)
 			if err != nil {
 				panic("Invalid JWT: couldn't read payload")
 			}
-			// TODO: single cookie to multiple path (list of protected routes)
 			cookie := newCookie("token_"+Host, jwt_token, Host, "/secret", jwt_payload.(Payload).Iat)
 
 			http.SetCookie(w, cookie)
@@ -111,21 +108,19 @@ in the request header "Authorization"
 */
 func ProtectedRoute(r *mux.Router, route string, handler func(http.ResponseWriter, *http.Request)) *mux.Route {
 	return r.HandleFunc(route, func(w http.ResponseWriter, r *http.Request){
-		// TODO: what is the need of the "Bearer" prefix?
-		// token := strings.Trim(r.Header["Authorization"][0], "Bearer ")
-		tokenCookie, err := r.Cookie("testcookie")
+		tokenCookie, err := r.Cookie("token_"+Host)
 		if err != nil {
 			fmt.Printf("Error occured while reading testcookie")
 			return
 		}
 
-		_, err = TokenReadPayload(tokenCookie.Value, Secret, ExpirationTime) // TODO: config
+		_, err = TokenReadPayload(tokenCookie.Value)
 		if err != nil {
 			fmt.Println(err)
-			fmt.Fprintf(w, "Authentication error")
+			fmt.Fprintf(w, "Authentication error") // TODO: add customizability
 			return
 		}
-		// TODO: add roles
+		// TODO: roles
 		handler(w, r)
 	})
 }
