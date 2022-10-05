@@ -21,6 +21,14 @@ type MuxJWT struct {
 	Host string
 }
 
+/*
+func NewMuxJWT returns a new MuxJWT instance
+@params:
+	- secret(string), the secret to use for the JWT encryption
+	- expTime(int64), the life-time in seconds of every JWT
+	- host(string), the host address
+@return: MuxJWT
+*/
 func NewMuxJWT(secret string, expTime int64, host string) MuxJWT {
 	if secret == "" {
 		panic("MuxJWT: secret must not be an empty string")
@@ -37,6 +45,41 @@ func NewMuxJWT(secret string, expTime int64, host string) MuxJWT {
 		ExpirationTime: expTime,
 		Host: host,
 	}
+}
+
+/*
+func InitAuthRoute initializes a new auth route using Gorilla Mux.
+this route is used for authenticating user credentials given by POST request body parameters
+and validates the credentials based on a given auth function.
+@params:
+	- router(*mux.Router), the router instance of the app
+	- authFunc(func(...string)->bool), the authentication function to validate given user credentials
+	- authRoute(string), the route to bind the auth service to
+	- bodyKeys(...string), the names(keys) of the POST body parameters to give to authFunc as values (ORDER MATTERS!)
+@return: nil (void)
+*/
+func (m MuxJWT) InitAuthRoute(router *mux.Router, authFunc func(map[string]string) bool, authRoute string, identifyFunc func(map[string]string)string, bodyKeys ...string) {
+	router.HandleFunc(authRoute, func(w http.ResponseWriter, r *http.Request){
+		// TODO?: accept JSON as POST data
+		body := make(map[string]string)
+		for i:=0; i < len(bodyKeys); i++ {
+			body[bodyKeys[i]] = r.FormValue(bodyKeys[i])
+		}
+
+		var jwt_token string
+		fmt.Println(body)
+		if authFunc(body) == true {
+			jwt_token = m.GenerateJWT(identifyFunc(body))
+			jwt_payload, err := m.TokenReadPayload(jwt_token)
+			if err != nil {
+				panic("Invalid JWT: couldn't read payload")
+			}
+			cookie := m.NewCookie("token_"+m.Host, jwt_token, m.Host, jwt_payload.(Payload).Iat)
+
+			http.SetCookie(w, cookie)
+			fmt.Fprintf(w, jwt_token) // DEBUG
+		}
+	}).Methods("POST")
 }
 
 /*
@@ -78,41 +121,6 @@ func (m MuxJWT) TokenReadPayload(jwt string) (interface{}, error) {
 }
 
 /*
-func InitAuthRoute initializes a new auth route using Gorilla Mux.
-this route is used for authenticating user credentials given by POST request body parameters
-and validates the credentials based on a given auth function.
-@params:
-	- router(*mux.Router), the router instance of the app
-	- authFunc(func(...string)->bool), the authentication function to validate given user credentials
-	- authRoute(string), the route to bind the auth service to
-	- bodyKeys(...string), the names(keys) of the POST body parameters to give to authFunc as values (ORDER MATTERS!)
-@return: nil (void)
-*/
-func (m MuxJWT) InitAuthRoute(router *mux.Router, authFunc func(map[string]string) bool, authRoute string, identifyFunc func(map[string]string)string, bodyKeys ...string) {
-	router.HandleFunc(authRoute, func(w http.ResponseWriter, r *http.Request){
-		// TODO?: accept JSON as POST data
-		body := make(map[string]string)
-		for i:=0; i < len(bodyKeys); i++ {
-			body[bodyKeys[i]] = r.FormValue(bodyKeys[i])
-		}
-
-		var jwt_token string
-		fmt.Println(body)
-		if authFunc(body) == true {
-			jwt_token = m.GenerateJWT(identifyFunc(body))
-			jwt_payload, err := m.TokenReadPayload(jwt_token)
-			if err != nil {
-				panic("Invalid JWT: couldn't read payload")
-			}
-			cookie := m.NewCookie("token_"+m.Host, jwt_token, m.Host, jwt_payload.(Payload).Iat)
-
-			http.SetCookie(w, cookie)
-			fmt.Fprintf(w, jwt_token) // DEBUG
-		}
-	}).Methods("POST")
-}
-
-/*
 func ProtectedRoute creates a new route using Gorilla Mux that can only be accessed to by using a valid JWT
 in the request header "Authorization"
 @params:
@@ -140,6 +148,12 @@ func (m MuxJWT) ProtectedRoute(r *mux.Router, route string, handler func(http.Re
 	})
 }
 
+/*
+func DeleteJWTCookie deletes a muxjwt cookie from the client's webbrowser
+@params:
+	- w(http.ResponseWriter), response writer
+@return: nil
+*/
 func (m MuxJWT) DeleteJWTCookie(w http.ResponseWriter) {
 	c := m.NewCookie("token_"+m.Host, "", m.Host, -m.ExpirationTime)
 	c.MaxAge = -1

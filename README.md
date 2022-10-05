@@ -22,7 +22,7 @@ r := mux.NewRouter()
 // Initialize a MuxJWT instace:
 m := muxjwt.NewMuxJWT("my_secret", 60, "localhost")
 // Create an "/auth" route that accepts POST requests:
-muxjwt.InitAuthRoute(r, authFunc, "/auth", identifyFunc, "username", "password")
+m.InitAuthRoute(r, authFunc, "/auth", identifyFunc, "username", "password")
 ```
 Where ``authFunc`` is the function responsible for authenticating given user credentials.
 

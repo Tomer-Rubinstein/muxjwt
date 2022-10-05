@@ -81,7 +81,6 @@ func newCookie declares a new http.Cookie instance by given parameters
 	- name(string), name of the cookie
 	- value(string), value of the cookie
 	- domain(string), to which domain this cookie points to
-	- path(string), to which path to send this cookie
 	- iat(int64), "issued at": the Unix timestamp at which the jwt was created
 */
 func (m MuxJWT) NewCookie(name string, value string, domain string, iat int64) *http.Cookie {
@@ -89,10 +88,7 @@ func (m MuxJWT) NewCookie(name string, value string, domain string, iat int64) *
 	cookie.Name = name
 	cookie.Value = value
 	cookie.Domain = domain
-	// cookie.Path = path
-	// cookie.Expires = <time obj>
 	cookie.RawExpires = fmt.Sprint(iat + m.ExpirationTime)
-	// cookie.MaxAge = <seconds>
 	cookie.Secure = false
 	cookie.HttpOnly = true
 	cookie.Raw = fmt.Sprintf("%s: %s", cookie.Name, cookie.Value)
