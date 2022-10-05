@@ -14,7 +14,7 @@ func main() {
 
   r.HandleFunc("/login", LoginHandler).Methods("GET")
 	m.ProtectedRoute(r, "/secret", SecretHandler).Methods("GET")
-	m.ProtectedRoute(r, "/secret2", SecondSecretHandler).Methods("GET")
+
 	fmt.Println("Listening on port 3000..")
 	http.ListenAndServe(":3000", r)
 }
@@ -25,10 +25,6 @@ func LoginHandler(w http.ResponseWriter, r *http.Request){
 
 func SecretHandler(w http.ResponseWriter, r *http.Request){
 	fmt.Fprintf(w, "<h1>Welcome to the Secret Page!</h1>")
-}
-
-func SecondSecretHandler(w http.ResponseWriter, r *http.Request){
-	fmt.Fprintf(w, "<h1>Welcome to the SECOND Secret Page!</h1>")
 }
 
 func authFunc(body map[string]string) bool {
