@@ -25,7 +25,9 @@ m := muxjwt.NewMuxJWT("my_secret", 60, "localhost")
 muxjwt.InitAuthRoute(r, authFunc, "/auth", identifyFunc, "username", "password")
 ```
 Where ``authFunc`` is the function responsible for authenticating given user credentials.
+
 The "username" and "password" arguments are the POST request body data keys to pass their values to ``authFunc``.
+
 And the ``identifyFunc`` returns the identifier of the request out of the given request body (in this case, the "username" field). It will be used as the subject claim in the payload of the JWT.
 
 For simplicity sake, we'll just authenticate a single admin user, like so:
@@ -68,6 +70,7 @@ func SecretHandler(w http.ResponseWriter, r *http.Request){
 </form>
 ```
 The above issues (on submit) a POST request to "/auth" with the body data being ``username=<USER>&password=<PASSW>``.
+
 ``authFunc`` will then take these values and verify them.
 If verified, MuxJWT will set a cookie named "token_localhost" with the value of the newly created JWT, on the client's browser.
 
