@@ -12,12 +12,8 @@ import (
 )
 
 // TODO: implement gorilla/securecookie(s) instead
-// TODO: implement logout functionality
-// TODO: auth func should also accept JSON post data
-
-// var Secret string
-// var ExpirationTime int64 // Note: in seconds
-// var Host string
+// TODO: add proper logs
+// TODO: add redirections&customizability support
 
 type MuxJWT struct {
 	Secret string
@@ -129,7 +125,7 @@ func (m MuxJWT) ProtectedRoute(r *mux.Router, route string, handler func(http.Re
 	return r.HandleFunc(route, func(w http.ResponseWriter, r *http.Request){
 		tokenCookie, err := r.Cookie("token_"+m.Host)
 		if err != nil {
-			fmt.Printf("Error occured while reading testcookie")
+			fmt.Println("MuxJWT: cookie not found")
 			return
 		}
 
@@ -142,4 +138,10 @@ func (m MuxJWT) ProtectedRoute(r *mux.Router, route string, handler func(http.Re
 		// TODO: roles
 		handler(w, r)
 	})
+}
+
+func (m MuxJWT) DeleteJWTCookie(w http.ResponseWriter) {
+	c := m.NewCookie("token_"+m.Host, "", m.Host, -m.ExpirationTime)
+	c.MaxAge = -1
+	http.SetCookie(w, c)
 }
