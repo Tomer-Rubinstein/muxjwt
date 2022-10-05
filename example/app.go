@@ -14,6 +14,9 @@ func main() {
 
   r.HandleFunc("/login", LoginHandler).Methods("GET")
 	m.ProtectedRoute(r, "/secret", SecretHandler).Methods("GET")
+	r.HandleFunc("/logout", func(w http.ResponseWriter, r *http.Request){
+		m.DeleteJWTCookie(w)
+	}).Methods("GET")
 
 	fmt.Println("Listening on port 3000..")
 	http.ListenAndServe(":3000", r)
