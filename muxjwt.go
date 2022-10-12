@@ -13,7 +13,6 @@ import (
 
 // TODO: implement gorilla/securecookie(s) instead
 // TODO: add proper logs
-// TODO: add redirections&customizability support
 
 type MuxJWT struct {
 	Secret string
@@ -68,7 +67,7 @@ func (m MuxJWT) InitAuthRoute(router *mux.Router, authFunc func(map[string]strin
 
 		var jwt_token string
 		fmt.Println(body)
-		if authFunc(body) == true {
+		if authFunc(body) {
 			jwt_token = m.GenerateJWT(identifyFunc(body))
 			jwt_payload, err := m.TokenReadPayload(jwt_token)
 			if err != nil {
@@ -77,8 +76,10 @@ func (m MuxJWT) InitAuthRoute(router *mux.Router, authFunc func(map[string]strin
 			cookie := m.NewCookie("token_"+m.Host, jwt_token, m.Host, jwt_payload.(Payload).Iat)
 
 			http.SetCookie(w, cookie)
-			fmt.Fprintf(w, jwt_token) // DEBUG
+			w.WriteHeader(http.StatusAccepted) // successful auth
+			return
 		}
+		w.WriteHeader(http.StatusForbidden) // failed auth
 	}).Methods("POST")
 }
 
@@ -133,14 +134,13 @@ func (m MuxJWT) ProtectedRoute(r *mux.Router, route string, handler func(http.Re
 	return r.HandleFunc(route, func(w http.ResponseWriter, r *http.Request){
 		tokenCookie, err := r.Cookie("token_"+m.Host)
 		if err != nil {
-			fmt.Println("MuxJWT: cookie not found")
+			m.NoAuthPage(w)
 			return
 		}
 
 		_, err = m.TokenReadPayload(tokenCookie.Value)
 		if err != nil {
-			fmt.Println(err)
-			fmt.Fprintf(w, "Authentication error") // TODO: add customizability
+			m.NoAuthPage(w)
 			return
 		}
 		// TODO: roles
@@ -158,4 +158,9 @@ func (m MuxJWT) DeleteJWTCookie(w http.ResponseWriter) {
 	c := m.NewCookie("token_"+m.Host, "", m.Host, -m.ExpirationTime)
 	c.MaxAge = -1
 	http.SetCookie(w, c)
+}
+
+func (m MuxJWT) NoAuthPage(w http.ResponseWriter) {
+	w.WriteHeader(http.StatusForbidden)
+	w.Write([]byte("No authentication"))
 }
